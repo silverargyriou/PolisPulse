@@ -223,6 +223,4 @@ __marimo__/
 dist/
 build/
 bin/
-
-# Optional: Ignore PyInstaller generated .spec files if you prefer not to track them
 *.spec
