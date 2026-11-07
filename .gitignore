@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# PyInstaller and Build Outputs
+dist/
+build/
+bin/
+
+# Optional: Ignore PyInstaller generated .spec files if you prefer not to track them
+*.spec
