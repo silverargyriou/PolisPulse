@@ -44,4 +44,7 @@ PolisPulse is currently built around a lightweight desktop setup wizard and clie
 1. Clone the repository:
    ```bash
    git clone https://github.com/silverargyriou/PolisPulse
-   cd PolisPulse
+   cd PolisPulse```
+
+__***Notice***__
+When project will be ready to install this you will need to install 1 .exe file.
