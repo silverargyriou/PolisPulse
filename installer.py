@@ -2,7 +2,7 @@ import sys
 import os
 import json
 import shutil
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QEventLoop, QTimer
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -14,13 +14,15 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QProgressBar,
     QFileDialog,
+    QCheckBox,
     QVBoxLayout,
     QHBoxLayout
 )
 
 config = {
     "api": "api.polispulse.org",
-    "install_path": os.path.join(os.path.expanduser("~"), "AppData", "Local", "PolisPulse")
+    "install_path": os.path.join(os.path.expanduser("~"), "AppData", "Local", "PolisPulse"),
+    "DevMode": False
 }
 
 def get_resource_path(relative_path):
@@ -30,6 +32,11 @@ def get_resource_path(relative_path):
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
+
+def wait_a_bit(s):
+    loop = QEventLoop()
+    QTimer.singleShot(int(s * 1000), loop.quit)
+    loop.exec()
 
 class WelcomePage_Screen(QWidget):
     def __init__(self, callback):
@@ -91,8 +98,14 @@ class BackendSelection_Screen(QWidget):
         self.apiInput.setPlaceholderText("Enter custom URL (e.g., http://192.168.1.50)")
         self.apiInput.hide()
         
+        self.DevMode = QCheckBox("Fake Install")
+        self.DevMode.setChecked(False)
+        self.DevMode.hide()
+        self.DevMode.clicked.connect(self.devMode_toggle)
+        
         comboLayout.addWidget(self.combo, alignment=Qt.AlignmentFlag.AlignLeft)
         comboLayout.addWidget(self.apiInput)
+        comboLayout.addWidget(self.DevMode)
         
         layoutCentral.addLayout(comboLayout)
         
@@ -114,12 +127,18 @@ class BackendSelection_Screen(QWidget):
 
     def combo_change(self, index):
         self.apiInput.hide()
+        self.DevMode.hide()
+        self.DevMode.setChecked(False)
+        
+        config["DevMode"] = False
+        
         if index == 0:
             config["api"] = "api.polispulse.org"
         elif index == 1:
             self.apiInput.show()
         elif index == 2:
             config["api"] = "localhost:8000"
+            self.DevMode.show()
 
     def clickProcess(self):
         if self.apiInput.isVisible():
@@ -127,6 +146,9 @@ class BackendSelection_Screen(QWidget):
         
         if self.nextCallback:
             self.nextCallback()
+    
+    def devMode_toggle(self, e):
+        config["DevMode"] = e
 
 
 class DirectoryWindow(QWidget):
@@ -177,6 +199,7 @@ class DirectoryWindow(QWidget):
 
     def browse_folder(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Select Installation Directory", directory=config["install_path"])
+        dir_path = dir_path.replace("/", "\\")
         if dir_path:
             self.pathInput.setText(os.path.join(dir_path, "PolisPulse"))
 
@@ -191,46 +214,128 @@ class InstallationProcess(QMainWindow):
         super().__init__()
         
         self.setWindowTitle("PolisPulse - Installing")
-        self.setFixedSize(300, 140)
+        self.setFixedSize(360, 150)
         
-        Widget = QWidget()
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f8f9fa;
+            }
+            QLabel {
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 13px;
+                color: #212529;
+            }
+            QProgressBar {
+                border: 1px solid #ced4da;
+                border-radius: 6px;
+                background-color: #e9ecef;
+                text-align: center;
+                height: 18px;
+                font-size: 11px;
+                font-weight: bold;
+                color: #495057;
+            }
+            QProgressBar::chunk {
+                background-color: #0d6efd;
+                border-radius: 5px;
+            }
+        """)
         
-        layoutCentral = QVBoxLayout(Widget)
+        widget = QWidget()
+        layout_central = QVBoxLayout(widget)
+        layout_central.setContentsMargins(24, 24, 24, 24)
+        layout_central.setSpacing(12)
         
+        # Status text label
+        self.status_label = QLabel("Initializing installation...")
+        layout_central.addWidget(self.status_label)
+        
+        # Progress bar
         self.progressBar = QProgressBar()
+        self.progressBar.setRange(0, 100)
+        self.progressBar.setValue(0)
+        layout_central.addWidget(self.progressBar)
+        
+        self.setCentralWidget(widget)
+        self.show()
+        
+        # Let the window render first, then start the install sequence using your wait_a_bit
+        QTimer.singleShot(100, self.run_installation)
 
-        layoutCentral.addWidget(self.progressBar)
-        
-        self.setCentralWidget(Widget)
-        
+    def set_progress(self, value, message):
+        """Updates progress bar and text, forcing an immediate UI repaint"""
+        self.progressBar.setValue(value)
+        self.status_label.setText(message)
+        QApplication.processEvents()
+
+    def run_installation(self):
         install_dir = config["install_path"]
-        print(install_dir)
-                
-        os.makedirs(install_dir, exist_ok=True)
-        self.binPath = os.path.join(install_dir, "bin")
-        os.makedirs(self.binPath, exist_ok=True)
-        self.recourcesPath = os.path.join(install_dir, "resources")
-        os.makedirs(self.recourcesPath, exist_ok=True)
         
-        self.save_configuration(self.recourcesPath)
-        self.create_bin()
-        self.create_desktop_shortcut()
+        if config["DevMode"]:
+            print("DevMode was on")
+            self.set_progress(5, "Simulating start...")
+            wait_a_bit(1)
+            self.set_progress(10, "Simulating configuration...")
+            wait_a_bit(1)
+            self.set_progress(15, "Simulating paths...")
+            wait_a_bit(1)
+            self.set_progress(25, "Simulating files...")
+            wait_a_bit(1)
+            self.set_progress(80, "Simulating shortcuts...")
+            wait_a_bit(1)
+            self.set_progress(100, "DevMode installation complete!")
+            wait_a_bit(0.5)
+            self.close()
+        else:
+            print("DevMode was off")
+            try:
+                self.set_progress(5, "Creating installation directory...")
+                os.makedirs(install_dir, exist_ok=True)
+                wait_a_bit(1)
+                
+                self.binPath = os.path.join(install_dir, "bin")
+                os.makedirs(self.binPath, exist_ok=True)
+                self.set_progress(10, "Setting up binary directory...")
+                wait_a_bit(1)
+                
+                self.recourcesPath = os.path.join(install_dir, "resources")
+                os.makedirs(self.recourcesPath, exist_ok=True)
+                self.set_progress(15, "Setting up resource directory...")
+                wait_a_bit(1)
+                
+                self.set_progress(25, "Saving configuration file...")
+                self.save_configuration(self.recourcesPath)
+                wait_a_bit(1)
+                
+                self.set_progress(50, "Copying application binaries...")
+                self.create_bin()
+                wait_a_bit(1)
+                
+                self.set_progress(85, "Creating desktop shortcut...")
+                self.create_desktop_shortcut()
+                wait_a_bit(1)
+                
+                self.set_progress(100, "Installation completed successfully!")
+                wait_a_bit(0.5)
+                self.close()
+                
+            except Exception as e:
+                self.status_label.setText(f"Error: {str(e)}")
+                print(f"Installation failed: {e}")
+
     def save_configuration(self, install_dir):
         config_file_path = os.path.join(install_dir, "config.json")
-        
         app_config = {
             "api_endpoint": config["api"],
             "install_path": install_dir,
             "version": "1.0.0"
         }
-        
         with open(config_file_path, "w", encoding="utf-8") as f:
             json.dump(app_config, f, indent=4)
-            
         print(f"Configuration successfully saved to: {config_file_path}")
+
     def create_bin(self):
         source_bin_dir = get_resource_path("bin")
-        
         if os.path.exists(source_bin_dir):
             for item in os.listdir(source_bin_dir):
                 s = os.path.join(source_bin_dir, item)
@@ -242,17 +347,14 @@ class InstallationProcess(QMainWindow):
             print("Main executable successfully placed in bin/")
         else:
             print("Error: Bundled binaries not found in installer package.")
+
     def create_desktop_shortcut(self, app_name="PolisPulse"):
-        # All these is AI as im unable to use shortcuts to my advantage.
-        
         if sys.platform.startswith("win"):
-            """Creates a Windows desktop shortcut pointing to the installed main.exe using PowerShell"""
             try:
                 target_exe = os.path.join(self.binPath, "PolisPulse.exe")
                 desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
                 shortcut_path = os.path.join(desktop_dir, "PolisPulse.lnk")
                 
-                # PowerShell command to create the shortcut natively with proper working directory
                 ps_command = f"""
                 $WScriptShell = New-Object -ComObject WScript.Shell;
                 $Shortcut = $WScriptShell.CreateShortcut('{shortcut_path}');
@@ -261,23 +363,18 @@ class InstallationProcess(QMainWindow):
                 $Shortcut.Save()
                 """
                 
-                # Execute the PowerShell command silently
                 import subprocess
                 subprocess.run(
                     ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_command],
                     check=True,
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
-                
                 print("Desktop shortcut created successfully via PowerShell!")
-                print("*Verification:* The file `PolisPulse.lnk` is present on the user's desktop and points to `binPath`.")
             except Exception as e:
                 print(f"Failed to create desktop shortcut: {e}")
         elif sys.platform.startswith("linux"):
-            # Linux .desktop file creation logic
             desktop_dir = os.path.expanduser("~/Desktop")
             desktop_file_path = os.path.join(desktop_dir, f"{app_name}.desktop")
-            
             desktop_entry = f"""[Desktop Entry]
             Type=Application
             Name={app_name}
@@ -287,11 +384,9 @@ class InstallationProcess(QMainWindow):
             """
             with open(desktop_file_path, "w", encoding="utf-8") as f:
                 f.write(desktop_entry)
-            # Make the .desktop file executable on Linux
             os.chmod(desktop_file_path, 0o755)
-            
-        elif sys.platform == "darwin":
-            # macOS symbolic link to Desktop logic
+        elif sys.platform.startswith("darwin"):
+            # someday this will be created
             pass
 
 class MainWindow(QMainWindow):
@@ -317,9 +412,11 @@ class MainWindow(QMainWindow):
         self.close()
         
         self.window = InstallationProcess()
-        self.window.show()
 
-app = QApplication(sys.argv)
-window = MainWindow()
-window.show()
-app.exec()
+if __name__ == "__main__":
+    
+    
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    app.exec()
