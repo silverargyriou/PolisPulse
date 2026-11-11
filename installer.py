@@ -246,11 +246,9 @@ class InstallationProcess(QMainWindow):
         layout_central.setContentsMargins(24, 24, 24, 24)
         layout_central.setSpacing(12)
         
-        # Status text label
         self.status_label = QLabel("Initializing installation...")
         layout_central.addWidget(self.status_label)
         
-        # Progress bar
         self.progressBar = QProgressBar()
         self.progressBar.setRange(0, 100)
         self.progressBar.setValue(0)
@@ -259,11 +257,9 @@ class InstallationProcess(QMainWindow):
         self.setCentralWidget(widget)
         self.show()
         
-        # Let the window render first, then start the install sequence using your wait_a_bit
-        QTimer.singleShot(100, self.run_installation)
+        QTimer.singleShot(20, self.run_installation)
 
     def set_progress(self, value, message):
-        """Updates progress bar and text, forcing an immediate UI repaint"""
         self.progressBar.setValue(value)
         self.status_label.setText(message)
         QApplication.processEvents()
@@ -348,6 +344,7 @@ class InstallationProcess(QMainWindow):
         else:
             print("Error: Bundled binaries not found in installer package.")
 
+    # Made with AI
     def create_desktop_shortcut(self, app_name="PolisPulse"):
         if sys.platform.startswith("win"):
             try:
@@ -386,7 +383,6 @@ class InstallationProcess(QMainWindow):
                 f.write(desktop_entry)
             os.chmod(desktop_file_path, 0o755)
         elif sys.platform.startswith("darwin"):
-            # someday this will be created
             pass
 
 class MainWindow(QMainWindow):
@@ -414,8 +410,6 @@ class MainWindow(QMainWindow):
         self.window = InstallationProcess()
 
 if __name__ == "__main__":
-    
-    
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
